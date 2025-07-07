@@ -1,12 +1,8 @@
 // This is your Prisma schema file,
 // learn more about it in the docs: https://pris.ly/d/prisma-schema
 
-// Looking for ways to speed up your queries, or scale easily with your serverless or edge functions?
-// Try Prisma Accelerate: https://pris.ly/cli/accelerate-init
-
 generator client {
   provider = "prisma-client-js"
-
 }
 
 datasource db {
@@ -14,9 +10,313 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
-model TestItem {
-  id      Int     @id @default(autoincrement())
-  title   String
-  value   String
+// Enum definitions
+enum PestType {
+  INSECT
+  MITE
+  NEMATODE
+  RODENT
+  BIRD
+  MOLLUSK
+  OTHER
+}
+
+enum DiseaseType {
+  FUNGAL
+  BACTERIAL
+  VIRAL
+  NUTRITIONAL
+  PHYSIOLOGICAL
+  OTHER
+}
+
+enum CropCategory {
+  CEREAL
+  LEGUME
+  ROOT_TUBER
+  VEGETABLE
+  FRUIT
+  CASH_CROP
+  FORAGE
+  OTHER
+}
+
+enum LivestockCategory {
+  CATTLE
+  GOAT
+  SHEEP
+  POULTRY
+  PIG
+  FISH
+  OTHER
+}
+
+enum ControlMethod {
+  BIOLOGICAL
+  CHEMICAL
+  CULTURAL
+  MECHANICAL
+  INTEGRATED
+  ORGANIC
+}
+
+enum DocumentType {
+  RESEARCH_PAPER
+  GUIDE
+  MANUAL
+  POLICY
+  TECHNICAL_BULLETIN
+  FACT_SHEET
+  OTHER
+}
+
+enum Severity {
+  LOW
+  MEDIUM
+  HIGH
+  CRITICAL
+}
+
+// Main models
+model Crop {
+  id              String        @id @default(cuid())
+  name            String        @unique
+  scientificName  String?
+  description     String?
+  category        CropCategory
+  commonNames     String[]
+  images          String[]
+  growingSeasons  String[]
+  varieties       String[]
+  createdAt       DateTime      @default(now())
+  updatedAt       DateTime      @updatedAt
+  
+  // Relationships
+  pests           CropPest[]
+  diseases        CropDisease[]
+  
+  @@map("crops")
+}
+
+model Livestock {
+  id              String            @id @default(cuid())
+  name            String            @unique
+  scientificName  String?
+  description     String?
+  category        LivestockCategory
+  commonNames     String[]
+  images          String[]
+  breeds          String[]
+  createdAt       DateTime          @default(now())
+  updatedAt       DateTime          @updatedAt
+  
+  // Relationships
+  pests           LivestockPest[]
+  diseases        LivestockDisease[]
+  
+  @@map("livestock")
+}
+
+model Pest {
+  id              String      @id @default(cuid())
+  name            String      @unique
+  scientificName  String?
+  description     String
+  type            PestType
+  commonNames     String[]
+  images          String[]
+  symptoms        String[]
+  lifecycle       String?
+  habitat         String?
+  distribution    String[]
+  severity        Severity    @default(MEDIUM)
+  createdAt       DateTime    @default(now())
+  updatedAt       DateTime    @updatedAt
+  
+  // Relationships
+  crops           CropPest[]
+  livestock       LivestockPest[]
+  controlMeasures PestControlMeasure[]
+  
+  @@map("pests")
+}
+
+model Disease {
+  id              String        @id @default(cuid())
+  name            String        @unique
+  scientificName  String?
+  description     String
+  type            DiseaseType
+  commonNames     String[]
+  images          String[]
+  symptoms        String[]
+  causes          String[]
+  transmission    String[]
+  severity        Severity      @default(MEDIUM)
+  createdAt       DateTime      @default(now())
+  updatedAt       DateTime      @updatedAt
+  
+  // Relationships
+  crops           CropDisease[]
+  livestock       LivestockDisease[]
+  controlMeasures DiseaseControlMeasure[]
+  
+  @@map("diseases")
+}
+
+model ControlMeasure {
+  id                String      @id @default(cuid())
+  name              String
+  description       String
+  method            ControlMethod
+  instructions      String[]
+  materials         String[]
+  dosage            String?
+  frequency         String?
+  precautions       String[]
+  effectiveness     Int         @default(0) // 0-100 scale
+  cost              String?     // LOW, MEDIUM, HIGH
+  environmentalImpact String?   // LOW, MEDIUM, HIGH
+  createdAt         DateTime    @default(now())
+  updatedAt         DateTime    @updatedAt
+  
+  // Relationships
+  pests             PestControlMeasure[]
+  diseases          DiseaseControlMeasure[]
+  
+  @@map("control_measures")
+}
+
+model Document {
+  id          String        @id @default(cuid())
+  title       String
+  description String?
+  type        DocumentType
+  fileUrl     String?
+  downloadUrl String?
+  author      String?
+  publisher   String?
+  publishDate DateTime?
+  tags        String[]
+  keywords    String[]
+  language    String       @default("en")
+  fileSize    Int?         // in bytes
+  pageCount   Int?
+  isPublic    Boolean      @default(true)
+  createdAt   DateTime     @default(now())
+  updatedAt   DateTime     @updatedAt
+  
+  @@map("documents")
+}
+
+// Junction tables for many-to-many relationships
+model CropPest {
+  id      String @id @default(cuid())
+  cropId  String
+  pestId  String
+  
+  crop    Crop   @relation(fields: [cropId], references: [id], onDelete: Cascade)
+  pest    Pest   @relation(fields: [pestId], references: [id], onDelete: Cascade)
+  
+  @@unique([cropId, pestId])
+  @@map("crop_pests")
+}
+
+model CropDisease {
+  id        String  @id @default(cuid())
+  cropId    String
+  diseaseId String
+  
+  crop      Crop    @relation(fields: [cropId], references: [id], onDelete: Cascade)
+  disease   Disease @relation(fields: [diseaseId], references: [id], onDelete: Cascade)
+  
+  @@unique([cropId, diseaseId])
+  @@map("crop_diseases")
+}
+
+model LivestockPest {
+  id          String    @id @default(cuid())
+  livestockId String
+  pestId      String
+  
+  livestock   Livestock @relation(fields: [livestockId], references: [id], onDelete: Cascade)
+  pest        Pest      @relation(fields: [pestId], references: [id], onDelete: Cascade)
+  
+  @@unique([livestockId, pestId])
+  @@map("livestock_pests")
+}
+
+model LivestockDisease {
+  id          String    @id @default(cuid())
+  livestockId String
+  diseaseId   String
+  
+  livestock   Livestock @relation(fields: [livestockId], references: [id], onDelete: Cascade)
+  disease     Disease   @relation(fields: [diseaseId], references: [id], onDelete: Cascade)
+  
+  @@unique([livestockId, diseaseId])
+  @@map("livestock_diseases")
+}
+
+model PestControlMeasure {
+  id               String         @id @default(cuid())
+  pestId           String
+  controlMeasureId String
+  
+  pest             Pest           @relation(fields: [pestId], references: [id], onDelete: Cascade)
+  controlMeasure   ControlMeasure @relation(fields: [controlMeasureId], references: [id], onDelete: Cascade)
+  
+  @@unique([pestId, controlMeasureId])
+  @@map("pest_control_measures")
+}
+
+model DiseaseControlMeasure {
+  id               String         @id @default(cuid())
+  diseaseId        String
+  controlMeasureId String
+  
+  disease          Disease        @relation(fields: [diseaseId], references: [id], onDelete: Cascade)
+  controlMeasure   ControlMeasure @relation(fields: [controlMeasureId], references: [id], onDelete: Cascade)
+  
+  @@unique([diseaseId, controlMeasureId])
+  @@map("disease_control_measures")
+}
+
+model FAQ {
+  id        String   @id @default(cuid())
+  question  String
+  answer    String
+  category  String?
+  tags      String[]
+  isActive  Boolean  @default(true)
+  order     Int      @default(0)
   createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  
+  @@map("faqs")
+}
+
+model ContactSubmission {
+  id        String   @id @default(cuid())
+  name      String
+  email     String
+  phone     String?
+  subject   String
+  message   String
+  isRead    Boolean  @default(false)
+  response  String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  
+  @@map("contact_submissions")
+}
+
+// Keep the test model for backward compatibility
+model TestItem {
+  id        Int      @id @default(autoincrement())
+  title     String
+  value     String
+  createdAt DateTime @default(now())
+  
+  @@map("test_items")
 }
